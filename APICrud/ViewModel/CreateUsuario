@@ -1,0 +1,7 @@
+namespace APICrud.ViewModel;
+
+public class CreateUsuario
+{
+    [Required]
+    public string Titulo { get; set; }
+}
