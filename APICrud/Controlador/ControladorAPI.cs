@@ -1,13 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using APICrud.Data;
 using APICrud.Modelos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.AspNetCore.Authorization;
+using APICrud.Services;
+using System.Security.Claims;
 
 namespace APICrud.Controlador
 {
@@ -22,32 +19,18 @@ namespace APICrud.Controlador
             _context = context;
         }
 
-        [HttpGet("usuarios")]
-        public async Task<IActionResult> GetAsync()
+        [Authorize]
+        [HttpGet("usuarios/me")]
+        public async Task<IActionResult> GetMeuUsuario()
         {
-            var usuarios = await _context.Usuarios.AsNoTracking().ToListAsync();
+            var userId = int.Parse(User.Identity.Name);
 
-            if (usuarios == null || !usuarios.Any())
-                return NotFound("Nenhum usuário encontrado.");
-
-            var usuariosViewModel = usuarios.Select(u => new UsuarioViewModel
-            {
-                Id = u.Id,
-                Email = u.Email
-            });
-
-            return Ok(usuariosViewModel);
-        }
-
-        [HttpGet("usuarios/{id}")]
-        public async Task<IActionResult> GetByIdAsync([FromRoute] int id)
-        {
             var usuario = await _context.Usuarios
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id);
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (usuario == null)
-                return NotFound($"Usuário com ID {id} não encontrado.");
+                return NotFound("Usuário não encontrado.");
 
             var usuarioViewModel = new UsuarioViewModel
             {
@@ -66,18 +49,14 @@ namespace APICrud.Controlador
 
             try
             {
-                // Verifica se já existe um usuário com esse e-mail
-                var emailExistente = await _context.Usuarios
-                    .AsNoTracking()
-                    .AnyAsync(x => x.Email == model.Email);
-
-                if (emailExistente)
-                    return BadRequest("Já existe um usuário com este e-mail.");
+                if (await _context.Usuarios.AnyAsync(u => u.Email == model.Email))
+                    return BadRequest("Já existe um usuário com esse e-mail.");
 
                 var usuario = new Usuario
                 {
                     Email = model.Email,
-                    SenhaHash = BCrypt.Net.BCrypt.HashPassword(model.Senha)
+                    SenhaHash = BCrypt.Net.BCrypt.HashPassword(model.Senha),
+                    Role = "user"
                 };
 
                 await _context.Usuarios.AddAsync(usuario);
@@ -95,55 +74,45 @@ namespace APICrud.Controlador
             }
         }
 
-
+        [Authorize]
         [HttpPut("usuarios/{id}")]
-        public async Task<IActionResult> PutAsync([FromRoute] int id, [FromBody] CreateUsuario model)
+        public async Task<IActionResult> PutAsync([FromRoute] int id, [FromBody] UpdateUsuario model)
         {
-            if (!ModelState.IsValid)
-                return BadRequest("Dados do usuário não podem ser nulos.");
+            var userId = int.Parse(User.Identity.Name);
+            var userRole = User.FindFirst("role")?.Value;
 
-            var usuario = await _context.Usuarios.FirstOrDefaultAsync(x => x.Id == id);
+            if (userRole != "admin" && userId != id)
+                return Unauthorized("Você não tem permissão para alterar este usuário.");
+
+            // Verifica se o ID é valido
+            if (!ModelState.IsValid)
+                return BadRequest("Dados inválidos.");
+
+            // Verifica se o usuário existe
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null)
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
-            usuario.Email = model.Email ?? usuario.Email;
-            if (!string.IsNullOrEmpty(model.Senha))
-            {
-                usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(model.Senha);
-            }
+            // Verifica senha atual
+            if (!BCrypt.Net.BCrypt.Verify(model.SenhaAtual, usuario.SenhaHash))
+                return BadRequest("Senha atual incorreta.");
+
+            // Verifica se email novo ja esta em uso
+            if (await _context.Usuarios.AnyAsync(u => u.Email == model.EmailNovo && u.Id != id))
+                return BadRequest("Email já está em uso por outro usuário.");
+
+            // Atualiza email
+            usuario.Email = model.EmailNovo;
+
+            // Se o usuario digitar uma nova senha, atualiza o hash
+            if (!string.IsNullOrEmpty(model.NovaSenha))
+                usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(model.NovaSenha);
 
             try
             {
-                // Verifica se o e-mail já existe para outro usuário 
-                if (!string.IsNullOrEmpty(usuario.Email = model.Email))
-                {
-                    var emailExistente = await _context.Usuarios
-                        .AsNoTracking()
-                        .AnyAsync(x => x.Email == usuario.Email && x.Id != id);
-                    if (emailExistente)
-                    {
-                        return BadRequest("Já existe um usuário com este e-mail.");
-                    }
-                }
-                // Verifica se o e-mail é nulo ou vazio
-                else if (string.IsNullOrEmpty(model.Email) && string.IsNullOrEmpty(usuario.Email))
-                {
-                    return BadRequest("E-mail não pode ser nulo.");
-                }
-                // Altera o e-mail se fornecido
-                else
-                {
-                    usuario.Email = model.Email;
-                }
-
-                // Atualiza a senha se fornecida
-                if (!string.IsNullOrEmpty(model.Senha))
-                {
-                    usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(model.Senha);
-                }
                 _context.Usuarios.Update(usuario);
                 await _context.SaveChangesAsync();
-                return Ok(usuario);
+                return Ok(new { usuario.Id, usuario.Email });
             }
             catch (Exception e)
             {
@@ -151,5 +120,88 @@ namespace APICrud.Controlador
             }
         }
 
+        [Authorize]
+        [HttpDelete("usuarios/{id}")]
+        public async Task<IActionResult> DeleteAsync(
+            [FromRoute] int id)
+        {
+
+            var userId = int.Parse(User.Identity.Name);
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            //Verifica se o usuário é admin ou se é o próprio usuário que está tentando deletar
+            if (userRole != "admin" && userId != id)
+                return Unauthorized("Você não tem permissão para alterar este usuário.");
+
+            if (!ModelState.IsValid)
+                return BadRequest("Dados Invalidos.");
+
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
+            if (usuario == null)
+                return NotFound($"Usuario com ID {id} não encontrado.");
+
+            try
+            {
+                _context.Usuarios.Remove(usuario);
+                await _context.SaveChangesAsync();
+                return Ok($"Usuario com ID {id} foi removido com sucesso.");
+            }
+
+            catch (Exception e)
+            {
+                return StatusCode(500, $"Erro ao atualizar usuário: {e.Message}");
+            }
+
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> LoginAsync([FromBody] ModeloLogin model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Dados inválidos.");
+
+            // Verifica se o usuário existe
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == model.Email);
+            if (usuario == null)
+                return Unauthorized("Usuário ou senha incorretos.");
+
+            // Se o usuario tiver bloqueio e o tempo de bloqueio ainda não tiver passado, retorna erro
+            if (usuario.Bloqueio.HasValue && usuario.Bloqueio > DateTime.UtcNow)
+                return Unauthorized($"Conta bloqueada até {usuario.Bloqueio.Value}.");
+
+
+            // Verifica se a senha informada corresponde ao hash armazenado
+            bool senhaValida = BCrypt.Net.BCrypt.Verify(model.Senha, usuario.SenhaHash);
+
+            //Cada tentativa de senha incorreta adiciona 1 tentativa, 3 tentativas incorretas bloqueiam.
+            if (!senhaValida)
+            {
+                usuario.TentativasLogin++;
+                if (usuario.TentativasLogin > 3)
+                {
+                    usuario.Bloqueio = DateTime.UtcNow.AddMinutes(15); //Bloqueia por 15min
+                    usuario.TentativasLogin = 0;
+                }
+                return Unauthorized("Usuário ou senha incorretos.");
+            }
+
+            //Se usuario e senha forem validos, gera um Token
+            usuario.TentativasLogin = 0; //Reseta tentativas de login
+            usuario.Bloqueio = null; //Remove bloqueio se existir
+            _context.Usuarios.Update(usuario);
+
+            var token = TokenService.GerarToken(usuario);
+
+            return Ok(new
+            {
+                token,
+                usuario = new UsuarioViewModel
+                {
+                    Id = usuario.Id,
+                    Email = usuario.Email
+                }
+            });
+
+        }
     }
 }
