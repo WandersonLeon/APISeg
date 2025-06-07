@@ -9,8 +9,8 @@ namespace APICrud.Modelos
     public class Tarefa
     {
         public int Id { get; set; }
-        public string Descricao { get; set; }
-        public string Titulo { get; set; }
+        public string ?Descricao { get; set; }
+        public required string Titulo { get; set; }
         public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
         public bool Concluida { get; set; }
 
@@ -20,6 +20,6 @@ namespace APICrud.Modelos
         e facilita a consulta de tarefas por usuário.
         */
         public int UsuarioId { get; set; }
-        public Usuario Usuario { get; set; }
+        public required Usuario Usuario { get; set; }
     }
 }

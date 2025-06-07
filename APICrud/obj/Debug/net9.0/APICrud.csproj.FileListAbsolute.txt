@@ -8,6 +8,7 @@ D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\APICrud.dll
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\APICrud.pdb
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\Azure.Core.dll
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\Azure.Identity.dll
+D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\BCrypt.Net-Next.dll
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\Humanizer.dll
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 D:\CSharp\APISeg\APICrud\bin\Debug\net9.0\Microsoft.AspNetCore.OpenApi.dll
@@ -149,6 +150,7 @@ D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\APICrud.AssemblyInfo.cs
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\APICrud.csproj.CoreCompileInputs.cache
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\APICrud.MvcApplicationPartsAssemblyInfo.cs
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\APICrud.MvcApplicationPartsAssemblyInfo.cache
+D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\APICrud.sourcelink.json
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\scopedcss\bundle\APICrud.styles.css
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\staticwebassets.build.json
 D:\CSharp\APISeg\APICrud\obj\Debug\net9.0\staticwebassets.build.json.cache

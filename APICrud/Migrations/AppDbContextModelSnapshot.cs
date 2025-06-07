@@ -37,7 +37,6 @@ namespace APICrud.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Descricao")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Titulo")
